@@ -606,6 +606,7 @@ begin
   t2 := High(SheetsNumbers);
   retCount := 0;
   //если пришёл пустой массив SheetsNumbers - берём все страницы из Sheets
+  //if an empty Sheets Numbers array is received, take all pages from Sheets
   if t1 = t2 + 1 then
   begin
     retCount := XMLSS.Sheets.Count;
@@ -615,6 +616,7 @@ begin
   end else
   begin
     //иначе берём страницы из массива SheetsNumbers
+    //otherwise we take pages from the SheetsNumbers array
     for i := t1 to t2 do
     begin
       if (SheetsNumbers[i] >= 0) and (SheetsNumbers[i] < XMLSS.Sheets.Count) then

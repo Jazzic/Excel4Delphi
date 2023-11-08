@@ -13,7 +13,8 @@ uses
   RegularExpressions,
   Generics.Collections,
   System.Contnrs,
-  Excel4Delphi.Xml;
+  Excel4Delphi.Xml,
+  Vcl.Imaging.pngimage;
 
 // 1 (topographical point) = 0.3528 mm
 const _PointToMM: real = 0.3528;
@@ -114,6 +115,10 @@ type
   private
     FText: string;
     FFont: TZFont;
+    FSuperscript: boolean;
+    FSubscript: boolean;
+    procedure SetSubscript(const Value: boolean);
+    procedure SetSuperscript(const Value: boolean);
   public
     property Text: string read FText write FText;
     property Font: TZFont read FFont write FFont;
@@ -121,6 +126,8 @@ type
     destructor Destroy(); override;
     procedure Assign(Source: TPersistent); override;
     function GetHashCode(): integer; override;
+    property Superscript: boolean read FSuperscript write SetSuperscript default false;
+    property Subscript: boolean read FSubscript write SetSubscript default false;
   end;
 
   TRichText = class(TPersistent)
@@ -1681,7 +1688,8 @@ type
     procedure Assign(Source: TPersistent); override;
 
     function Add(): TZEPicture; overload;
-    function Add(ARow, ACol: Integer; APicture: TBytes): TZEPicture; overload;
+    function Add(AFromRow, AFromCol, AToRow, AToCol: Integer; APicture: TBytes; Name: string): TZEPicture; overload;
+    function Add(AFromRow, AFromCol, AToRow, AToCol: Integer; APicture: TPngImage; Name: string): TZEPicture; overload;
 
     procedure Delete(idx: integer);
     procedure Clear();
@@ -1920,7 +1928,7 @@ type
   private
     FStore: TZWorkBook;
     FSheets: array of TZSheet;
-    FCount : integer;
+    function GetSheetCount: integer;
     procedure SetSheetCount(const Value: integer);
     procedure SetSheet(num: integer; Const Value: TZSheet);
     function  GetSheet(num: integer): TZSheet;
@@ -1931,7 +1939,7 @@ type
     /// <summary>
     /// Number of sheets in the document.
     /// </summary>
-    property Count: integer read FCount write SetSheetCount;
+    property Count: integer read GetSheetCount write SetSheetCount;
     /// <summary>
     /// Document's sheet num.
     /// </summary>
@@ -4639,16 +4647,12 @@ end;
 constructor TZSheets.Create(AStore: TZWorkBook);
 begin
   FStore := AStore;
-  FCount := 0;
   SetLength(FSheets, 0);
 end;
 
 destructor TZSheets.Destroy();
-var i: integer;
 begin
-  for i := 0 to FCount - 1 do
-    FreeAndNil(FSheets[i]);
-  SetLength(FSheets, 0);
+  Count := 0;
   FSheets := nil;
   FStore := nil;
   inherited Destroy();
@@ -4676,22 +4680,28 @@ end;
 procedure TZSheets.SetSheetCount(const Value: integer);
 var i: integer;
 begin
-  if Count < Value then begin
+  if Count < Value then
+  begin
     SetLength(FSheets, Value);
     for i := Count to Value - 1 do
       FSheets[i] := TZSheet.Create(FStore);
-  end else begin
+  end else
+  begin
     for i:= Value to Count - 1  do
       FreeAndNil(FSheets[i]);
     SetLength(FSheets, Value);
   end;
-  FCount := Value;
 end;
 
 procedure TZSheets.SetSheet(num: integer; Const Value: TZSheet);
 begin
   if (num < Count) and (num >= 0) then
     FSheets[num].Assign(Value);
+end;
+
+function TZSheets.GetSheetCount: integer;
+begin
+  result := length(FSheets);
 end;
 
 function TZSheets.GetSheet(num: Integer): TZSheet;
@@ -6355,7 +6365,7 @@ end;
 procedure TZEPicture.CommonInit();
 begin
   FId := 0;
-  FRelId := 0;
+  FRelId := -1;
   FTitle := '';
   FDescription := '';
   FRow := 0;
@@ -6378,12 +6388,18 @@ end;
 
 function TZEPicture.GetImage: TBytes;
 begin
-  result := FSheet.WorkBook.MediaList[self.RelId-1].Content;
+  if self.RelId <> -1 then
+    result := FSheet.WorkBook.MediaList[self.RelId].Content
+  else
+    result := [];
 end;
 
 procedure TZEPicture.SetImage(const Value: TBytes);
 begin
-  //FSheet.WorkBook.MediaList
+  if RelId = -1 then
+    RelId := FSheet.WorkBook.AddMediaContent(FFileName, Value, false)
+  else
+    FSheet.WorkBook.MediaList[self.RelId].Content := Value;
 end;
 
 function TZEPicture.IsEqual(const Source: TPersistent): boolean;
@@ -6426,6 +6442,19 @@ begin
   inherited;
 end;
 
+function TZEDrawing.Add(AFromRow, AFromCol, AToRow, AToCol: Integer; APicture: TPngImage; Name: string): TZEPicture;
+var
+  stream: TBytesStream;
+begin
+  stream:= TBytesStream.Create;
+  try
+    APicture.SaveToStream(stream);
+    result := Add(AFromRow, AFromCol, AToRow, AToCol, stream.Bytes, Name);
+  finally
+    stream.Free;
+  end;
+end;
+
 procedure TZEDrawing.Assign(Source: TPersistent);
 var tmp: TZEDrawing; b: boolean; i: integer;
 begin
@@ -6444,14 +6473,18 @@ begin
     inherited Assign(Source);
 end;
 
-function TZEDrawing.Add(ARow, ACol: Integer; APicture: TBytes): TZEPicture;
+function TZEDrawing.Add(AFromRow, AFromCol, AToRow, AToCol: Integer; APicture: TBytes; Name: string): TZEPicture;
 begin
   result := TZEPicture.Create(FSheet);
   FItems.Add(result);
+  Result.Name := Name;
   Result.Image := APicture;
-  Result.RelId := FItems.Count;
-  Result.Row := ARow;
-  Result.Col := ACol;
+  Result.Row := AFromRow;
+  Result.Col := AFromCol;
+  Result.FromRow := AFromRow;
+  Result.FromCol := AFromCol;
+  Result.ToRow := AToRow;
+  Result.ToCol := AToCol;
   Result.CellAnchor := ZACell;
 end;
 
@@ -7195,6 +7228,8 @@ begin
       FFont := TZFont.Create();
       FFont.Assign(TRichString(Source).FFont);
     end;
+    Superscript := TRichString(Source).Superscript;
+    Subscript := TRichString(Source).Subscript;
   end;
 end;
 
@@ -7204,6 +7239,16 @@ begin
   result := result * 23 + FText.GetHashCode();
   if Assigned(FFont) then
     result := result * 23 + FFont.GetHashCode();
+end;
+
+procedure TRichString.SetSubscript(const Value: boolean);
+begin
+  FSubscript := Value;
+end;
+
+procedure TRichString.SetSuperscript(const Value: boolean);
+begin
+  FSuperscript := Value;
 end;
 
 { TZExport }

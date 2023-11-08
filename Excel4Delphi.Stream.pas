@@ -4759,7 +4759,7 @@ begin
       xml.WriteTagNode('xdr:blipFill', false, false, false);
       // --- a:blip
       xml.Attributes.Clear();
-      xml.Attributes.Add('r:embed', 'rId' + IntToStr(pic.RelId)); // rId1
+      xml.Attributes.Add('r:embed', 'rId' + IntToStr(pic.RelId+1)); // rId1
       xml.WriteEmptyTag('a:blip', false);
       // --- a:stretch
       xml.Attributes.Clear();
@@ -4835,7 +4835,7 @@ begin
 
     for pair in dic do begin
       xml.Attributes.Clear();
-      xml.Attributes.Add('Id', 'rId' + IntToStr(pair.Key));
+      xml.Attributes.Add('Id', 'rId' + IntToStr(pair.Key+1));
       xml.Attributes.Add('Type', SCHEMA_DOC_REL + '/image');
       xml.Attributes.Add('Target', '../media/' + pair.Value);
       xml.WriteEmptyTag('Relationship', false, true);
@@ -5143,6 +5143,7 @@ var xml: TZsspXMLWriterH;    //писатель
             if Assigned(cell.RichText) then begin
               cellValue := IntToStr(staredStrings.Add(cell.RichText));
               s := 's';
+              b := true;
             end else
             if cellValue.StartsWith(' ') or cellValue.EndsWith(' ')
             or (cellValue.IndexOfAny([#10, #13]) >= 0) then begin
@@ -6347,10 +6348,22 @@ begin
             xml.WriteEmptyTag('charset', true);
           end;
 
-          if not trim(part.Font.Scheme).IsEmpty then begin
+//          if not trim(part.Font.Scheme).IsEmpty then begin
+//            xml.Attributes.Clear();
+//            xml.Attributes.Add('val', part.Font.Scheme, false);
+//            xml.WriteEmptyTag('scheme', true);
+//          end;
+
+          if part.Subscript then begin
             xml.Attributes.Clear();
-            xml.Attributes.Add('val', part.Font.Scheme, false);
-            xml.WriteEmptyTag('scheme', true);
+            xml.Attributes.Add('val', 'subscript', false);
+            xml.WriteEmptyTag('vertAlign', true);
+          end;
+
+          if part.Superscript then begin
+            xml.Attributes.Clear();
+            xml.Attributes.Add('val', 'superscript', false);
+            xml.WriteEmptyTag('vertAlign', true);
           end;
 
           xml.WriteEndTagNode();// rPr
@@ -6469,7 +6482,6 @@ var
   path_xl, path_sheets, path_relsmain, path_relsw, path_docprops: string;
   s: string;
   SharedStrings: TSharedStringBank;
-  //iDrawingsCount: Integer;
   //path_draw, path_draw_rel, path_media: string;
   //_drawing: TZEDrawing;
   //_pic: TZEPicture;
