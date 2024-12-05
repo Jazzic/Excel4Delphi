@@ -4663,6 +4663,7 @@ begin
   result := TZSheet.Create(FStore);
   SetLength(FSheets, Length(FSheets) + 1);
   FSheets[High(FSheets)] := result;
+  result.Title:= title;
 end;
 
 procedure TZSheets.Assign(Source: TPersistent);
@@ -4678,12 +4679,15 @@ begin
 end;
 
 procedure TZSheets.SetSheetCount(const Value: integer);
-var i: integer;
+var
+  i: integer;
+  oldCount: integer;
 begin
   if Count < Value then
   begin
+    oldCount:= Count;
     SetLength(FSheets, Value);
-    for i := Count to Value - 1 do
+    for i := oldCount to Value - 1 do
       FSheets[i] := TZSheet.Create(FStore);
   end else
   begin
